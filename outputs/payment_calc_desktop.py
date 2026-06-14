@@ -4,9 +4,6 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-
-PAPER_RATE = 5
-
 THEMES = {
     "Light": {
         "bg": "#f5f7fb",
@@ -35,8 +32,8 @@ def format_currency(amount):
     return f"{amount:,.0f} BDT"
 
 
-def generate_report(total_classes, class_earnings, daily_log, exam_count, month_name, year):
-    paper_earnings = exam_count * PAPER_RATE
+def generate_report(total_classes, class_earnings, daily_log, exam_count, paper_rate, month_name, year):
+    paper_earnings = exam_count * paper_rate
     final_total = class_earnings + paper_earnings
 
     lines = []
@@ -52,6 +49,7 @@ def generate_report(total_classes, class_earnings, daily_log, exam_count, month_
     lines.append(f"Class Earnings: {format_currency(class_earnings)}")
 
     lines.append(f"\nExam Papers Checked: {exam_count}")
+    lines.append(f"Paper Rate: {format_currency(paper_rate)}")
     lines.append(f"Paper Earnings: {format_currency(paper_earnings)}")
 
     lines.append("\n----------------------------------")
@@ -65,8 +63,8 @@ class PaymentCalculatorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Payment Calculator")
-        self.root.geometry("760x640")
-        self.root.minsize(680, 520)
+        self.root.geometry("860x640")
+        self.root.minsize(760, 520)
 
         self.style = ttk.Style()
         try:
@@ -78,6 +76,7 @@ class PaymentCalculatorApp:
         self.last_report = ""
 
         self.rate_var = tk.StringVar()
+        self.paper_rate_var = tk.StringVar(value="5")
         self.exam_var = tk.StringVar(value="0")
         self.month_var = tk.IntVar(value=datetime.now().month)
         self.year_var = tk.IntVar(value=datetime.now().year)
@@ -98,7 +97,10 @@ class PaymentCalculatorApp:
         ttk.Label(controls, text="Class rate (BDT)").grid(row=0, column=0, sticky=tk.W, padx=(0, 8))
         ttk.Entry(controls, textvariable=self.rate_var, width=16).grid(row=1, column=0, sticky=tk.W, padx=(0, 16))
 
-        ttk.Label(controls, text="Month").grid(row=0, column=1, sticky=tk.W, padx=(0, 8))
+        ttk.Label(controls, text="Paper rate (BDT)").grid(row=0, column=1, sticky=tk.W, padx=(0, 8))
+        ttk.Entry(controls, textvariable=self.paper_rate_var, width=16).grid(row=1, column=1, sticky=tk.W, padx=(0, 16))
+
+        ttk.Label(controls, text="Month").grid(row=0, column=2, sticky=tk.W, padx=(0, 8))
         month_box = ttk.Combobox(
             controls,
             textvariable=self.month_var,
@@ -106,10 +108,10 @@ class PaymentCalculatorApp:
             width=8,
             state="readonly",
         )
-        month_box.grid(row=1, column=1, sticky=tk.W, padx=(0, 16))
+        month_box.grid(row=1, column=2, sticky=tk.W, padx=(0, 16))
         month_box.bind("<<ComboboxSelected>>", lambda _event: self._rebuild_days())
 
-        ttk.Label(controls, text="Year").grid(row=0, column=2, sticky=tk.W, padx=(0, 8))
+        ttk.Label(controls, text="Year").grid(row=0, column=3, sticky=tk.W, padx=(0, 8))
         year_spin = ttk.Spinbox(
             controls,
             from_=2000,
@@ -118,14 +120,14 @@ class PaymentCalculatorApp:
             width=8,
             command=self._rebuild_days,
         )
-        year_spin.grid(row=1, column=2, sticky=tk.W, padx=(0, 16))
+        year_spin.grid(row=1, column=3, sticky=tk.W, padx=(0, 16))
         year_spin.bind("<FocusOut>", lambda _event: self._rebuild_days())
         year_spin.bind("<Return>", lambda _event: self._rebuild_days())
 
-        ttk.Label(controls, text="Exam papers checked").grid(row=0, column=3, sticky=tk.W, padx=(0, 8))
-        ttk.Entry(controls, textvariable=self.exam_var, width=18).grid(row=1, column=3, sticky=tk.W)
+        ttk.Label(controls, text="Exam papers checked").grid(row=0, column=4, sticky=tk.W, padx=(0, 8))
+        ttk.Entry(controls, textvariable=self.exam_var, width=18).grid(row=1, column=4, sticky=tk.W)
 
-        ttk.Label(controls, text="Theme").grid(row=0, column=4, sticky=tk.W, padx=(16, 8))
+        ttk.Label(controls, text="Theme").grid(row=0, column=5, sticky=tk.W, padx=(16, 8))
         theme_box = ttk.Combobox(
             controls,
             textvariable=self.theme_var,
@@ -133,7 +135,7 @@ class PaymentCalculatorApp:
             width=10,
             state="readonly",
         )
-        theme_box.grid(row=1, column=4, sticky=tk.W)
+        theme_box.grid(row=1, column=5, sticky=tk.W)
         theme_box.bind("<<ComboboxSelected>>", lambda _event: self.apply_theme())
 
         main = ttk.PanedWindow(outer, orient=tk.HORIZONTAL)
@@ -234,6 +236,13 @@ class PaymentCalculatorApp:
             raise ValueError(str(exc) or "Enter a valid class rate.")
 
         try:
+            paper_rate = float(self.paper_rate_var.get())
+            if paper_rate < 0:
+                raise ValueError("Paper rate cannot be negative.")
+        except ValueError as exc:
+            raise ValueError(str(exc) or "Enter a valid paper rate.")
+
+        try:
             exam_count = int(self.exam_var.get() or "0")
             if exam_count < 0:
                 raise ValueError
@@ -261,11 +270,11 @@ class PaymentCalculatorApp:
             class_earnings += earnings
             daily_log.append((day, classes, earnings))
 
-        return rate, total_classes, class_earnings, daily_log, exam_count
+        return rate, total_classes, class_earnings, daily_log, exam_count, paper_rate
 
     def generate(self):
         try:
-            _rate, total_classes, class_earnings, daily_log, exam_count = self._read_inputs()
+            _rate, total_classes, class_earnings, daily_log, exam_count, paper_rate = self._read_inputs()
         except ValueError as exc:
             messagebox.showerror("Invalid input", str(exc))
             return
@@ -279,6 +288,7 @@ class PaymentCalculatorApp:
             class_earnings,
             daily_log,
             exam_count,
+            paper_rate,
             month_name,
             year,
         )
@@ -313,6 +323,7 @@ class PaymentCalculatorApp:
 
     def clear(self):
         self.rate_var.set("")
+        self.paper_rate_var.set("5")
         self.exam_var.set("0")
         for _day, value in self.daily_entries:
             value.set("0")
