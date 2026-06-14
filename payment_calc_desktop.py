@@ -7,6 +7,29 @@ from tkinter import filedialog, messagebox, ttk
 
 PAPER_RATE = 5
 
+THEMES = {
+    "Light": {
+        "bg": "#f5f7fb",
+        "panel": "#ffffff",
+        "text": "#17202a",
+        "muted": "#4d5b6a",
+        "field": "#ffffff",
+        "button": "#e8edf5",
+        "button_active": "#dce5f2",
+        "select": "#dce8ff",
+    },
+    "Dark": {
+        "bg": "#1f2329",
+        "panel": "#2b3038",
+        "text": "#f2f5f8",
+        "muted": "#c5ccd6",
+        "field": "#181c22",
+        "button": "#3a414b",
+        "button_active": "#46505d",
+        "select": "#344966",
+    },
+}
+
 
 def format_currency(amount):
     return f"{amount:,.0f} BDT"
@@ -45,6 +68,12 @@ class PaymentCalculatorApp:
         self.root.geometry("760x640")
         self.root.minsize(680, 520)
 
+        self.style = ttk.Style()
+        try:
+            self.style.theme_use("clam")
+        except tk.TclError:
+            pass
+
         self.daily_entries = []
         self.last_report = ""
 
@@ -52,10 +81,12 @@ class PaymentCalculatorApp:
         self.exam_var = tk.StringVar(value="0")
         self.month_var = tk.IntVar(value=datetime.now().month)
         self.year_var = tk.IntVar(value=datetime.now().year)
+        self.theme_var = tk.StringVar(value="Light")
         self.status_var = tk.StringVar(value="Enter details, then click Generate Report.")
 
         self._build_ui()
         self._rebuild_days()
+        self.apply_theme()
 
     def _build_ui(self):
         outer = ttk.Frame(self.root, padding=12)
@@ -93,6 +124,17 @@ class PaymentCalculatorApp:
 
         ttk.Label(controls, text="Exam papers checked").grid(row=0, column=3, sticky=tk.W, padx=(0, 8))
         ttk.Entry(controls, textvariable=self.exam_var, width=18).grid(row=1, column=3, sticky=tk.W)
+
+        ttk.Label(controls, text="Theme").grid(row=0, column=4, sticky=tk.W, padx=(16, 8))
+        theme_box = ttk.Combobox(
+            controls,
+            textvariable=self.theme_var,
+            values=list(THEMES.keys()),
+            width=10,
+            state="readonly",
+        )
+        theme_box.grid(row=1, column=4, sticky=tk.W)
+        theme_box.bind("<<ComboboxSelected>>", lambda _event: self.apply_theme())
 
         main = ttk.PanedWindow(outer, orient=tk.HORIZONTAL)
         main.pack(fill=tk.BOTH, expand=True, pady=(12, 8))
@@ -133,6 +175,29 @@ class PaymentCalculatorApp:
         ttk.Button(actions, text="Clear", command=self.clear).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Label(actions, textvariable=self.status_var).pack(side=tk.LEFT, padx=(16, 0))
 
+    def apply_theme(self):
+        colors = THEMES[self.theme_var.get()]
+
+        self.root.configure(bg=colors["bg"])
+        self.style.configure(".", background=colors["bg"], foreground=colors["text"])
+        self.style.configure("TFrame", background=colors["bg"])
+        self.style.configure("TLabel", background=colors["bg"], foreground=colors["text"])
+        self.style.configure("TButton", background=colors["button"], foreground=colors["text"])
+        self.style.map("TButton", background=[("active", colors["button_active"])])
+        self.style.configure("TEntry", fieldbackground=colors["field"], foreground=colors["text"])
+        self.style.configure("TCombobox", fieldbackground=colors["field"], foreground=colors["text"])
+        self.style.configure("TSpinbox", fieldbackground=colors["field"], foreground=colors["text"])
+        self.style.configure("TPanedwindow", background=colors["bg"])
+
+        self.days_canvas.configure(bg=colors["bg"])
+        self.report_text.configure(
+            bg=colors["field"],
+            fg=colors["text"],
+            insertbackground=colors["text"],
+            selectbackground=colors["select"],
+            relief=tk.FLAT,
+        )
+
     def _rebuild_days(self):
         try:
             month = int(self.month_var.get())
@@ -156,6 +221,9 @@ class PaymentCalculatorApp:
             entry = ttk.Entry(row, textvariable=value, width=8)
             entry.pack(side=tk.LEFT)
             self.daily_entries.append((day, value))
+
+        if hasattr(self, "days_canvas"):
+            self.apply_theme()
 
     def _read_inputs(self):
         try:
