@@ -3,7 +3,6 @@ __pycache__/
 
 # PyInstaller temporary build output.
 work/pyinstaller_build/
-work/pyinstaller_calendar_build/
 
 # Local editor and OS files.
 .vscode/
